@@ -48,8 +48,14 @@ def write_mpd(out_path: str,
 
     # 逐颗零件（位置为体素中心；旋转为单位阵）
     for idx, (i, j, k) in enumerate(placements):
-        center_mm = (index_to_mm_center @ np.array([i, j, k, 1.0]))[:3]  #这一行代码的作用是： 将体素索引 ([i, j, k]) 转换为以毫米为单位的三维空间坐标。  具体过程如下：  np.array([i, j, k, 1.0]) 构造一个齐次坐标（4维向量）。index_to_mm_center @ ... 用 4x4 变换矩阵 index_to_mm_center 对索引进行仿射变换，得到实际的空间坐标（单位为毫米）。[:3] 取前三个分量，得到 (x, y, z) 三维坐标。简言之，这一步是把体素的索引位置变换为实际的三维空间中心点坐标
-
+        #这一行代码的作用是： 将体素索引 ([i, j, k]) 转换为以毫米为单位的三维空间坐标。  
+        # 具体过程如下：  np.array([i, j, k, 1.0]) 构造一个齐次坐标（4维向量）。
+        # index_to_mm_center @ ... 
+        # 用 4x4 变换矩阵 index_to_mm_center 对索引进行仿射变换，
+        # 得到实际的空间坐标（单位为毫米）。[:3] 取前三个分量，
+        # 得到 (x, y, z) 三维坐标。
+        # 简言之，这一步是把体素的索引位置变换为实际的三维空间中心点坐标
+        center_mm = (index_to_mm_center @ np.array([i, j, k, 1.0]))[:3]  
         pos_ldu = _mm_to_ldu_xyz(center_mm)
 
         # LDraw line type 1: 1 COLOR x y z a b c d e f g h i part.dat

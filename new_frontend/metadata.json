@@ -1,0 +1,5 @@
+{
+  "name": "Brickify 3D - Voxel to LDraw Converter",
+  "description": "Convert standard 3D OBJ models into Lego-compatible LDraw (.ldr) files. Features real-time voxelization, 3D preview, and Gemini AI analysis to generate set names and descriptions.",
+  "requestFramePermissions": []
+}

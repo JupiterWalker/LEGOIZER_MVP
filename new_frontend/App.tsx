@@ -374,7 +374,7 @@ export default function App() {
       <div className="flex-1 relative">
          <div className="absolute top-4 left-4 z-10 flex gap-2">
             <button 
-                onClick={() => setShowOriginal(true)}
+                onClick={() => setShowOriginal(!showOriginal)}
                 className="bg-neutral-800/80 backdrop-blur text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2 border border-neutral-700 hover:bg-neutral-700"
             >
                 {showOriginal ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}

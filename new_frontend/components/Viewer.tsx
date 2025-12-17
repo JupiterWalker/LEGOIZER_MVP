@@ -174,9 +174,9 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
           // Apply material
           processedMesh.material = new THREE.MeshStandardMaterial({ 
              color: 0xff0000, 
-             wireframe: false,
-             transparent: false,
-             opacity: 1,
+             wireframe: true,
+             transparent: true,
+             opacity: 0.3,
              side: THREE.FrontSide
           });
 
@@ -223,6 +223,19 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     // Scale the entire group to match the original mesh dimensions
     // Since voxels are normalized integers, multiplying by gridSize restores the world scale
     group.scale.set(gridSize, gridSize, gridSize);
+
+    // Compute voxel index bounds so we can center the grid around (0,0)
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    voxels.forEach(v => {
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.z < minZ) minZ = v.z;
+      if (v.z > maxZ) maxZ = v.z;
+    });
+
+    const centerXIndex = (minX + maxX + 1) / 2; // +0.5 cell center baked in
+    const centerZIndex = (minZ + maxZ + 1) / 2;
     
     // Geometry Definition
     const heightRatio = brickType === 'plate' ? PLATE_HEIGHT_RATIO : BRICK_HEIGHT_RATIO;
@@ -247,18 +260,18 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
             metalness: 0.1
         });
         
-        const instancedMesh = new THREE.InstancedMesh(geometry, material, voxelList.length);
+          const instancedMesh = new THREE.InstancedMesh(geometry, material, voxelList.length);
         const dummy = new THREE.Object3D();
 
+        // Adjust voxel rendering Y-axis
         voxelList.forEach((v, i) => {
-             // Position mapping from JSON integer coordinates
-             dummy.position.set(
-                v.x, 
-                v.y * heightRatio + (heightRatio / 2), 
-                v.z
-             );
-             dummy.updateMatrix();
-             instancedMesh.setMatrixAt(i, dummy.matrix);
+            dummy.position.set(
+                v.x + 0.5 - centerXIndex,
+                -v.y * heightRatio - (heightRatio / 2), // Flip Y-axis
+                v.z + 0.5 - centerZIndex
+            );
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
         });
         
         instancedMesh.castShadow = true;
@@ -290,6 +303,8 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
 
     const group = new THREE.Group();
 
+    const TARGET_SIZE = 40; // Keep in sync with meshProcessor normalization
+
     const height = brickType === 'plate' ? LDRAW_PLATE_HEIGHT : LDRAW_BRICK_HEIGHT;
     const gap = 0.98;
     const geom = new THREE.BoxGeometry(
@@ -317,8 +332,12 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       const instanced = new THREE.InstancedMesh(geom, material, list.length);
       const dummy = new THREE.Object3D();
       list.forEach((b, i) => {
-        // Center cube at brick center; add half height on Y to stand on ground if positions are bottom-centered
-        dummy.position.set(b.x, b.y + height / 2, b.z);
+        // Place cube centered at brick position; add half height on Y so bottom rests on Y=0 before normalization
+        dummy.position.set(
+          b.x,
+          -b.y - height / 2, // Flip Y-axis
+          b.z
+        );
         dummy.updateMatrix();
         instanced.setMatrixAt(i, dummy.matrix);
 
@@ -327,7 +346,9 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
         const halfY = (height * gap) / 2;
         const halfZ = (LDRAW_UNIT_WIDTH * gap) / 2;
         minX = Math.min(minX, b.x - halfX); maxX = Math.max(maxX, b.x + halfX);
-        minY = Math.min(minY, b.y);       maxY = Math.max(maxY, b.y + height);
+        // minY = Math.min(minY, b.y);       maxY = Math.max(maxY, b.y + height);
+        minY = Math.min(minY, -b.y - height); // 底部是 -b.y - height
+        maxY = Math.max(maxY, -b.y);         // 顶部是 -b.y
         minZ = Math.min(minZ, b.z - halfZ); maxZ = Math.max(maxZ, b.z + halfZ);
       });
       instanced.castShadow = true;
@@ -335,16 +356,28 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       group.add(instanced);
     });
 
+    // Normalize MPD group to match processed mesh normalization (TARGET_SIZE, centered XZ, bottom at 0)
+    const sizeX = maxX - minX;
+    const sizeY = maxY - minY;
+    const sizeZ = maxZ - minZ;
+    const mpdMaxDim = Math.max(sizeX, sizeY, sizeZ);
+    if (mpdMaxDim > 0) {
+      const scaleFactor = TARGET_SIZE / mpdMaxDim;
+      group.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+      const centerX = ((minX + maxX) / 2) * scaleFactor;
+      const centerZ = ((minZ + maxZ) / 2) * scaleFactor;
+      const bottomY = minY * scaleFactor;
+      group.position.set(-centerX, -bottomY, -centerZ);
+    }
+
     mpdGroupRef.current = group;
     sceneRef.current.add(group);
 
-    // Frame camera to fit MPD
+    // Frame camera to fit normalized MPD
     if (cameraRef.current) {
-      const sizeX = maxX - minX;
-      const sizeY = maxY - minY;
-      const sizeZ = maxZ - minZ;
-      const maxDim = Math.max(sizeX, sizeY, sizeZ);
-      const center = new THREE.Vector3((minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+      const maxDim = mpdMaxDim > 0 ? TARGET_SIZE : 100;
+      const center = new THREE.Vector3(0, (maxY - minY) / 2, 0);
       cameraRef.current.position.set(center.x + maxDim * 1.5, center.y + maxDim * 1.5, center.z + maxDim * 1.5);
       cameraRef.current.lookAt(center);
     }
