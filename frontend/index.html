@@ -1,93 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Legoizer Web</title>
-  <link rel="stylesheet" href="style.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Brickify 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { margin: 0; overflow: hidden; background-color: #111; color: white; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "three/": "https://esm.sh/three@^0.182.0/",
+    "three": "https://esm.sh/three@^0.182.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
 </head>
-<body>
-  <main class="container">
-    <h1>Legoizer Web</h1>
-    <p class="description">Upload an OBJ or DAE model and download the generated MPD package.</p>
-
-    <form id="upload-form" class="card">
-      <label class="field">
-        <span>Model file (.obj / .dae)</span>
-        <input type="file" id="model-file" name="file" accept=".obj,.dae" required>
-      </label>
-
-      <label class="field">
-        <span>Material file (.mtl, optional)</span>
-        <input type="file" id="mtl-file" name="mtl" accept=".mtl">
-      </label>
-
-      <div class="field-row">
-        <label class="field">
-          <span>Unit</span>
-          <select id="unit" name="unit">
-            <option value="mm" selected>mm</option>
-            <option value="cm">cm</option>
-            <option value="m">m</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Part</span>
-          <select id="part" name="part">
-            <option value="plate_1x1">plate_1x1</option>
-            <option value="brick_1x1">brick_1x1</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="field-row">
-        <label class="field">
-          <span>Max dimension limit (mm)</span>
-          <input type="number" id="max_dim_limit" name="max_dim_limit" value="100" min="1" step="1">
-        </label>
-
-        <label class="field">
-          <span>Scale</span>
-          <input type="number" id="scale" name="scale" value="1" min="0.01" step="0.01">
-        </label>
-      </div>
-
-      <div class="field-row">
-        <label class="field">
-          <span>Default color (LDraw ID)</span>
-          <input type="number" id="default_color" name="default_color" value="71" min="0" step="1">
-        </label>
-
-        <label class="field">
-          <span>Surface thickness (mm, optional)</span>
-          <input type="number" id="surface_thickness_mm" name="surface_thickness_mm" min="0" step="0.1" placeholder="auto">
-        </label>
-      </div>
-
-      <label class="field">
-        <span>Color mode</span>
-        <select id="color_mode" name="color_mode">
-          <option value="none" selected>none</option>
-          <option value="mtl_surface_only">mtl_surface_only</option>
-          <option value="mtl_nearest">mtl_nearest</option>
-          <option value="mtl_texture_surface_only">mtl_texture_surface_only</option>
-          <option value="mtl_texture">mtl_texture</option>
-        </select>
-      </label>
-
-      <button type="submit" class="primary">Convert</button>
-    </form>
-
-    <section id="status" class="status"></section>
-
-    <a id="download-link" class="download hidden" download>Download result</a>
-
-    <section id="metadata" class="metadata hidden">
-      <h2>Report</h2>
-      <pre id="metadata-content"></pre>
-    </section>
-  </main>
-
-  <script src="app.js"></script>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
 </body>
 </html>
