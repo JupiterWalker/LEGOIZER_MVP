@@ -46,6 +46,11 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
   useEffect(() => {
     if (!mountRef.current) return;
 
+    // 防止在开发模式 / 热重载下重复挂载，先清空已有 canvas
+    while (mountRef.current.firstChild) {
+      mountRef.current.removeChild(mountRef.current.firstChild);
+    }
+
     const width = mountRef.current.clientWidth;
     const height = mountRef.current.clientHeight;
 
@@ -58,10 +63,11 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
     camera.position.set(60, 60, 60);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    // Disable preserveDrawingBuffer/shadows to avoid driver bugs like glTexStorage2D immutable errors
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
     renderer.setSize(width, height);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+    renderer.shadowMap.enabled = false;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     mountRef.current.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -76,16 +82,14 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     // Main Directional Light
     const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(50, 100, 50);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.bias = -0.0001;
+    dirLight.castShadow = false;
     scene.add(dirLight);
     lightRef.current = dirLight;
 
     // Back/Rim Light for better definition
     const backLight = new THREE.DirectionalLight(0xaaccff, 0.5);
     backLight.position.set(-50, 20, -50);
+    backLight.castShadow = false;
     scene.add(backLight);
 
     sceneRef.current = scene;
@@ -151,7 +155,7 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       if (meshRef.current) sceneRef.current.remove(meshRef.current);
 
       // Process new object
-      const group = new THREE.Group();
+
       let mainMesh: THREE.Mesh | null = null;
 
       // Find the first mesh
@@ -169,14 +173,15 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
 
           // Apply material
           processedMesh.material = new THREE.MeshStandardMaterial({ 
-             color: 0x00ff00, 
-             wireframe: true,
-             transparent: true,
-             opacity: 0.3,
-             side: THREE.DoubleSide
+             color: 0xff0000, 
+             wireframe: false,
+             transparent: false,
+             opacity: 1,
+             side: THREE.FrontSide
           });
 
-          group.add(processedMesh); 
+          const group = new THREE.Group();
+          group.add(processedMesh);
           meshRef.current = group;
           sceneRef.current.add(group);
           
@@ -185,8 +190,10 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
           const size = new THREE.Vector3();
           box.getSize(size);
           const maxDim = Math.max(size.x, size.y, size.z);
-          cameraRef.current?.position.set(maxDim * 1.5, maxDim * 1.5, maxDim * 1.5);
-          cameraRef.current?.lookAt(0, size.y / 2, 0);
+          // cameraRef.current?.position.set(maxDim * 1.5, maxDim * 1.5, maxDim * 1.5);
+          // cameraRef.current?.lookAt(0, size.y / 2, 0);
+          cameraRef.current?.position.set(60, 60, 60);
+          cameraRef.current?.lookAt(0, 0, 0);
           console.log('[Viewer] Camera repositioned for new mesh: ', processedMesh);
           onMeshLoaded(processedMesh);
       }
