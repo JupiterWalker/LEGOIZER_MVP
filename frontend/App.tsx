@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { Upload, Download, Settings, RefreshCw, Box, Eye, EyeOff, Sparkles, Layers, Sun, FileJson } from 'lucide-react';
+import { Upload, Download, Settings, RefreshCw, Box, Eye, Sparkles, Layers, Sun, FileJson } from 'lucide-react';
 import MinimalViewer from './components/MinimalViewer';
 import { generateLDR, downloadFile } from './utils/exporter';
 import { voxelizeMesh } from './utils/voxelizer';
@@ -34,9 +34,9 @@ export default function App() {
   const [settings, setSettings] = useState<ProcessingSettings>({
       ...DEFAULT_SETTINGS
   });
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-  const [showOriginal, setShowOriginal] = useState(true);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isDone, setIsDone] = useState(false);
+    const [viewMode, setViewMode] = useState<'original' | 'generated'>('original');
   const [aiAnalysis, setAiAnalysis] = useState<AiAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lightRotation, setLightRotation] = useState(45); // Degrees
@@ -56,6 +56,7 @@ export default function App() {
 
     const brickCount = typeof reportMetadata?.count === 'number' ? (reportMetadata.count as number) : null;
     const voxelCount = typeof reportMetadata?.voxels === 'number' ? (reportMetadata.voxels as number) : null;
+    const hasGeneratedResult = Boolean(mpdBricks && mpdBricks.length);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setIsDone(false);
@@ -67,8 +68,8 @@ export default function App() {
             setMpdBricks(null);
       setGridSize(1);
       setMesh(null);
-      setAiAnalysis(null);
-      setShowOriginal(true);
+    setAiAnalysis(null);
+    setViewMode('original');
     }
   };
 
@@ -81,6 +82,7 @@ export default function App() {
         setMpdDownloadUrl(null);
         setMpdBricks(null);
         setIsDone(false);
+        setViewMode('original');
 
         // try {
         //     const selectedColor = LEGO_COLORS.find(c => c.code === settings.colorCode) || LEGO_COLORS[0];
@@ -96,7 +98,7 @@ export default function App() {
 
         //     setVoxels(newVoxels);
         //     setGridSize(newGridSize);
-        //     setShowOriginal(true);
+        //     setViewMode('original');
         // } catch (error) {
         //     console.error('Voxelization failed', error);
         //     alert('Voxelization failed.');
@@ -144,9 +146,8 @@ export default function App() {
             try {
                 const bricks = parseMpdInstances(text);
                 setMpdBricks(bricks);
-                // Hide client-side voxel overlay in favor of MPD result
                 setVoxels(bricks);
-                setShowOriginal(true);
+                setViewMode(bricks.length > 0 ? 'generated' : 'original');
             } catch (parseErr) {
                 console.warn('Failed to parse MPD content, falling back to client voxels', parseErr);
             }
@@ -163,6 +164,7 @@ export default function App() {
             console.error('Backend processing failed', error);
             const message = error instanceof Error ? error.message : 'Processing failed.';
             setApiError(message);
+            setViewMode('original');
             alert(message);
         } finally {
             setIsProcessing(false);
@@ -376,14 +378,22 @@ export default function App() {
 
       {/* Main Viewport */}
     <div className="flex-1 relative">
-        <div className="absolute top-4 left-4 z-10 flex gap-4">
-            <button
-                onClick={() => setShowOriginal(!showOriginal)}
-                className="bg-neutral-800/80 backdrop-blur text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2 border border-neutral-700 hover:bg-neutral-700"
-            >
-                {showOriginal ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                {showOriginal ? "Hide Original" : "Show Original"}
-            </button>
+        <div className="absolute top-4 left-4 z-10 flex gap-4 flex-wrap">
+            <div className="flex bg-neutral-800/80 backdrop-blur border border-neutral-700 rounded-md overflow-hidden">
+                <button
+                    onClick={() => setViewMode('original')}
+                    className={`px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${viewMode === 'original' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
+                >
+                    <Eye className="w-4 h-4" /> Original
+                </button>
+                <button
+                    onClick={() => setViewMode('generated')}
+                    disabled={!hasGeneratedResult}
+                    className={`px-3 py-1.5 text-sm flex items-center gap-2 transition-colors border-l border-neutral-700 ${viewMode === 'generated' ? 'bg-neutral-700 text-white' : hasGeneratedResult ? 'text-neutral-400 hover:text-neutral-200' : 'text-neutral-600 cursor-not-allowed'}`}
+                >
+                    <Sparkles className="w-4 h-4" /> Result
+                </button>
+            </div>
 
             <div className="bg-neutral-800/80 backdrop-blur text-neutral-400 px-3 py-1.5 rounded-md text-sm border border-neutral-700">
                 Voxels: {voxels.length}
@@ -402,18 +412,19 @@ export default function App() {
             </div>
         </div>
 
-         <Viewer 
-            ref={viewerRef}
-            objFile={file} 
-            voxels={voxels}
+            <Viewer 
+                ref={viewerRef}
+                objFile={file} 
+                voxels={voxels}
                 mpdBricks={mpdBricks || undefined}
-            gridSize={gridSize}
-            showOriginal={showOriginal}
-            brickType={settings.brickType}
-            lightRotation={lightRotation}
-            onMeshLoaded={setMesh}
-            isLoading={isProcessing}
-         />
+                gridSize={gridSize}
+                showOriginal={viewMode === 'original'}
+                showGenerated={viewMode === 'generated' && hasGeneratedResult}
+                brickType={settings.brickType}
+                lightRotation={lightRotation}
+                onMeshLoaded={setMesh}
+                isLoading={isProcessing}
+            />
       </div>
     </div>
   );

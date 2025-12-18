@@ -13,6 +13,7 @@ interface ViewerProps {
   mpdBricks?: MpdBrick[];
   gridSize: number;
   showOriginal: boolean;
+  showGenerated: boolean;
   brickType: BrickType;
   lightRotation: number;
   onMeshLoaded: (mesh: THREE.Object3D) => void;
@@ -23,7 +24,7 @@ export interface ViewerRef {
   getScreenshot: () => string;
 }
 
-const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks, gridSize, showOriginal, brickType, lightRotation, onMeshLoaded, isLoading }, ref) => {
+const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks, gridSize, showOriginal, showGenerated, brickType, lightRotation, onMeshLoaded, isLoading }, ref) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -330,6 +331,7 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       group.position.set(-centerX, -bottomY, -centerZ);
     }
 
+    group.visible = showGenerated;
     mpdGroupRef.current = group;
     sceneRef.current.add(group);
 
@@ -347,6 +349,12 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
        meshRef.current.visible = showOriginal;
      }
   }, [showOriginal]);
+
+  useEffect(() => {
+    if (mpdGroupRef.current) {
+      mpdGroupRef.current.visible = showGenerated;
+    }
+  }, [showGenerated]);
 
   return (
     <div className="relative w-full h-full bg-neutral-900 overflow-hidden">
