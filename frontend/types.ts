@@ -40,4 +40,5 @@ export interface MpdBrick {
   y: number; // LDraw units
   z: number; // LDraw units
   colorCode: number; // LDraw color code
+  colorHex?: string; // Resolved hex when direct colour is present
 }

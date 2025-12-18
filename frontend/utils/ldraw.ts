@@ -16,13 +16,24 @@ export function parseMpdInstances(text: string): MpdBrick[] {
     const parts = line.split(/\s+/);
     if (parts.length < 14) continue;
 
-    const colorCode = parseInt(parts[1], 10);
+    const colorToken = parts[1];
+    let colorCode = Number.NaN;
+    let colorHex: string | undefined;
+    if (/^0x/i.test(colorToken)) {
+      colorCode = Number.parseInt(colorToken, 16);
+      if (Number.isFinite(colorCode)) {
+        const rgb = colorCode & 0xFFFFFF;
+        colorHex = `#${rgb.toString(16).padStart(6, '0')}`;
+      }
+    } else {
+      colorCode = Number.parseInt(colorToken, 10);
+    }
     const x = parseFloat(parts[2]);
     const y = parseFloat(parts[3]);
     const z = parseFloat(parts[4]);
 
     if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && Number.isFinite(colorCode)) {
-      bricks.push({ x, y, z, colorCode });
+      bricks.push({ x, y, z, colorCode, colorHex });
     }
   }
   return bricks;

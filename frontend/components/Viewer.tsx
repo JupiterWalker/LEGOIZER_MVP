@@ -270,22 +270,27 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       LDRAW_UNIT_WIDTH * gap
     );
 
-    // Map color code to hex
-    const codeToHex = (code: number) => LEGO_COLORS.find(c => c.code === code)?.hex || '#FFFFFF';
+    const resolveBrickHex = (brick: MpdBrick): string => {
+      if (brick.colorHex) return brick.colorHex;
+      return LEGO_COLORS.find(c => c.code === brick.colorCode)?.hex || '#FFFFFF';
+    };
 
-    // Group by color
-    const colorMap = new Map<number, MpdBrick[]>();
-    for (const b of mpdBricks) {
-      if (!colorMap.has(b.colorCode)) colorMap.set(b.colorCode, []);
-      colorMap.get(b.colorCode)!.push(b);
+    // Group bricks by resolved colour string so instancing can reuse materials.
+    const colourBuckets = new Map<string, MpdBrick[]>();
+    for (const brick of mpdBricks) {
+      const hex = resolveBrickHex(brick);
+      if (!colourBuckets.has(hex)) {
+        colourBuckets.set(hex, []);
+      }
+      colourBuckets.get(hex)!.push(brick);
     }
 
     // Track bounds for camera framing
     let minX = Infinity, minY = Infinity, minZ = Infinity;
     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
-    colorMap.forEach((list, code) => {
-      const material = new THREE.MeshStandardMaterial({ color: codeToHex(code), roughness: 0.4, metalness: 0.1 });
+    colourBuckets.forEach((list, hex) => {
+      const material = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.4, metalness: 0.1 });
       const instanced = new THREE.InstancedMesh(geom, material, list.length);
       const dummy = new THREE.Object3D();
       list.forEach((b, i) => {
