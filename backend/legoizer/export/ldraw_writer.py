@@ -26,6 +26,22 @@ def _mm_to_ldu_xyz(xyz_mm):
     x, y, z = xyz_mm
     return np.array([x, z, y]) / MM_PER_LDU
 
+def _format_ldraw_color(value, fallback: int) -> str:
+    """Render LDraw colour code, respecting true-colour encoding."""
+    if value is None:
+        return str(fallback)
+    if isinstance(value, str):
+        return value
+    try:
+        ival = int(value)
+    except (TypeError, ValueError):
+        return str(fallback)
+    if 0x02000000 <= ival <= 0x02FFFFFF:
+        direct_rgb = ival & 0x00FFFFFF
+        return f"0x2{direct_rgb:06X}"
+    return str(ival)
+
+
 def write_mpd(out_path: str,
               part_key: str,
               placements: List[Tuple[int,int,int]],
@@ -60,8 +76,11 @@ def write_mpd(out_path: str,
 
         # LDraw line type 1: 1 COLOR x y z a b c d e f g h i part.dat
         a,b,c,d,e,f,g,h,i_m = 1,0,0, 0,1,0, 0,0,1
+        colour_code = None
+        if colors is not None and idx < len(colors):
+            colour_code = colors[idx]
         lines.append(
-            f"1 { (colors[idx] if (colors is not None and idx < len(colors) and colors[idx] is not None) else default_color) } "
+            f"1 {_format_ldraw_color(colour_code, default_color)} "
             f"{pos_ldu[0]:.3f} {pos_ldu[1]:.3f} {pos_ldu[2]:.3f} "
             f"{a} {b} {c} {d} {e} {f} {g} {h} {i_m} "
             f"{ldraw_id}.dat"

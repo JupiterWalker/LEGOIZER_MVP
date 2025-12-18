@@ -220,40 +220,47 @@ def _get_basecolor_image_from_visual(vis) -> Optional[np.ndarray]:
     tex = getattr(mat, "baseColorTexture", None)
     img = None
     if tex is not None:
+        if isinstance(tex, np.ndarray):
+            img = tex
+        elif Image is not None and hasattr(tex, "mode") and hasattr(tex, "size"):
+            # tex may already be a PIL Image when loaded from GLB
+            try:
+                img = np.array(tex.convert("RGBA"))
+            except Exception:
+                img = None
+        else:
         # 1) 直接 image / images
-        for key in ("image", "images"):
-            if hasattr(tex, key):
-                v = getattr(tex, key)
-                if v is None:
-                    continue
-                # images 可能为列表
-                if isinstance(v, (list, tuple)) and len(v) > 0:
-                    v = v[0]
-                try:
-                    if hasattr(v, "mode"):
-                        # PIL Image
-                        img = np.array(v.convert("RGBA"), dtype=np.uint8)
-                    else:
-                        arr = np.asarray(v)
-                        if arr.ndim >= 2:
-                            img = arr
-                except Exception:
-                    pass
-                if img is not None:
-                    break
-        # 2) 路径（少见）
-        if img is None:
-            for key in ("image_path", "source", "path"):
+            for key in ("image", "images"):
                 if hasattr(tex, key):
-                    p = getattr(tex, key)
-                    if p:
-                        if Image is None:
-                            raise RuntimeError("需要 Pillow 才能从纹理路径读取图像：pip install pillow")
-                        try:
-                            img = np.array(Image.open(p).convert("RGBA"))
-                            break
-                        except Exception:
-                            pass
+                    v = getattr(tex, key)
+                    if v is None:
+                        continue
+                    if isinstance(v, (list, tuple)) and len(v) > 0:
+                        v = v[0]
+                    try:
+                        if Image is not None and hasattr(v, "mode"):
+                            img = np.array(v.convert("RGBA"), dtype=np.uint8)
+                        else:
+                            arr = np.asarray(v)
+                            if arr.ndim >= 2:
+                                img = arr
+                    except Exception:
+                        pass
+                    if img is not None:
+                        break
+            # 2) 路径（少见）
+            if img is None:
+                for key in ("image_path", "source", "path"):
+                    if hasattr(tex, key):
+                        p = getattr(tex, key)
+                        if p:
+                            if Image is None:
+                                raise RuntimeError("需要 Pillow 才能从纹理路径读取图像：pip install pillow")
+                            try:
+                                img = np.array(Image.open(p).convert("RGBA"))
+                                break
+                            except Exception:
+                                pass
 
     if img is None:
         return None

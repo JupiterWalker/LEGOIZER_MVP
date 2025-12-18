@@ -27,7 +27,7 @@ const parseFilenameFromContentDisposition = (header: string | null): string | nu
 export default function App() {
   const viewerRef = useRef<ViewerRef>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [mesh, setMesh] = useState<THREE.Mesh | null>(null);
+  const [mesh, setMesh] = useState<THREE.Object3D | null>(null);
   const [voxels, setVoxels] = useState<VoxelStruct[]>([]);
     const [mpdBricks, setMpdBricks] = useState<MpdBrick[] | null>(null);
   const [gridSize, setGridSize] = useState<number>(1);
@@ -109,7 +109,7 @@ export default function App() {
             formData.append('part', settings.brickType === 'plate' ? 'plate_1x1' : 'brick_1x1');
             formData.append('max_dim_limit', String(resolution));
             formData.append('default_color', String(settings.colorCode));
-            formData.append('color_mode', 'none');
+            formData.append('color_mode', 'auto');
 
             const response = await fetch(`${API_BASE_URL}/api/process`, {
                 method: 'POST',
@@ -206,7 +206,7 @@ export default function App() {
             <Box className="w-8 h-8" />
             Brickify 3D
           </h1>
-          <p className="text-xs text-neutral-500 mt-1">OBJ &rarr; MPD</p>
+          <p className="text-xs text-neutral-500 mt-1">OBJ / .GLB File &rarr; MPD</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
@@ -217,10 +217,10 @@ export default function App() {
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-6 h-6 mb-2 text-neutral-400" />
                     <p className="text-xs text-neutral-400">
-                        {file ? file.name : "Upload .OBJ File"}
+                        {file ? file.name : "Upload .OBJ / .GLB File"}
                     </p>
                 </div>
-                <input type="file" accept=".obj" className="hidden" onChange={handleFileChange} />
+                <input type="file" accept=".obj,.glb" className="hidden" onChange={handleFileChange} />
             </label>
           </section>
 

@@ -29,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SUPPORTED_INPUTS = {".obj", ".dae"}
+SUPPORTED_INPUTS = {".obj", ".glb"}
 
 
 @app.get("/health")

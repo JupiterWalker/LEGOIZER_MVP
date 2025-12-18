@@ -2,9 +2,10 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VoxelStruct, BrickType, MpdBrick } from '../types';
 import { BRICK_HEIGHT_RATIO, PLATE_HEIGHT_RATIO, LDRAW_UNIT_WIDTH, LDRAW_BRICK_HEIGHT, LDRAW_PLATE_HEIGHT, LEGO_COLORS } from '../constants';
-import { processMesh } from '../utils/meshProcessor';
+import { processMesh, normalizeScene } from '../utils/meshProcessor';
 
 interface ViewerProps {
   objFile: File | null;
@@ -14,7 +15,7 @@ interface ViewerProps {
   showOriginal: boolean;
   brickType: BrickType;
   lightRotation: number;
-  onMeshLoaded: (mesh: THREE.Mesh) => void;
+  onMeshLoaded: (mesh: THREE.Object3D) => void;
   isLoading: boolean;
 }
 
@@ -27,7 +28,7 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const meshRef = useRef<THREE.Group | null>(null);
+  const meshRef = useRef<THREE.Object3D | null>(null);
   const voxelGroupRef = useRef<THREE.Group | null>(null);
   const mpdGroupRef = useRef<THREE.Group | null>(null);
   const lightRef = useRef<THREE.DirectionalLight | null>(null);
@@ -66,23 +67,23 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     // Disable preserveDrawingBuffer/shadows to avoid driver bugs like glTexStorage2D immutable errors
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: false });
     renderer.setSize(width, height);
-    renderer.shadowMap.enabled = false;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.enabled = true; // Enable shadows for better visualization
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mountRef.current.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); // Slightly brighter ambient
     scene.add(ambientLight);
-    scene.add(hemiLight);
 
     // Main Directional Light
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
     dirLight.position.set(50, 100, 50);
-    dirLight.castShadow = false;
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
     scene.add(dirLight);
     lightRef.current = dirLight;
 
@@ -136,70 +137,94 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     }
   }, [lightRotation]);
 
-  // Handle OBJ Loading
+  // Handle Model Loading (OBJ & GLB/GLTF)
   useEffect(() => {
-    console.log('[Viewer] OBJ File changed:', objFile);
+    console.log('[Viewer] File changed:', objFile);
     if (!objFile || !sceneRef.current) return;
 
-    const loader = new OBJLoader();
-    const reader = new FileReader();
+    const fileName = objFile.name.toLowerCase();
+    const isGlb = fileName.endsWith('.glb') || fileName.endsWith('.gltf');
 
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      console.log('OBJ file content:', result); // 调试日志
-      if (!result) return;
-      const object = loader.parse(result);
-      console.log('Parsed OBJ object:', object); // 调试日志
-      
-      // Cleanup previous
-      if (meshRef.current) sceneRef.current.remove(meshRef.current);
+    // Cleanup previous
+    if (meshRef.current) {
+        sceneRef.current.remove(meshRef.current);
+        meshRef.current = null;
+    }
 
-      // Process new object
+    if (isGlb) {
+        const loader = new GLTFLoader();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const arrayBuffer = e.target?.result as ArrayBuffer;
+            if (!arrayBuffer) return;
+            
+            loader.parse(arrayBuffer, '', (gltf) => {
+                const object = gltf.scene;
+                // console.log('[Viewer] GLB Loaded:', object);
 
-      let mainMesh: THREE.Mesh | null = null;
+                // Normalize scene (Scale & Center) without merging
+                normalizeScene(object);
 
-      // Find the first mesh
-      object.traverse((child) => {
-        console.log('Traversing child:', child); // 调试日志
-        if (!mainMesh && (child as THREE.Mesh).isMesh) {
-          mainMesh = child as THREE.Mesh;
-        }
-      });
+                // Add to scene
+                meshRef.current = object;
+                sceneRef.current?.add(object);
 
-      if (mainMesh) {
-        console.log('[Viewer] Loaded main mesh:', mainMesh);
-          // Process the mesh: Clean, Fix, Center, Auto-scale
-          const processedMesh = processMesh(mainMesh as THREE.Mesh);
+                // Update Camera
+                cameraRef.current?.position.set(60, 60, 60);
+                cameraRef.current?.lookAt(0, 0, 0);
 
-          // Apply material
-          processedMesh.material = new THREE.MeshStandardMaterial({ 
-             color: 0xff0000, 
-             wireframe: true,
-             transparent: true,
-             opacity: 0.3,
-             side: THREE.FrontSide
-          });
+                onMeshLoaded(object);
+            }, (err) => {
+                console.error('[Viewer] Error parsing GLB:', err);
+            });
+        };
+        reader.readAsArrayBuffer(objFile);
 
-          const group = new THREE.Group();
-          group.add(processedMesh);
-          meshRef.current = group;
-          sceneRef.current.add(group);
-          
-          // Fit camera to the new geometry size
-          const box = processedMesh.geometry.boundingBox!;
-          const size = new THREE.Vector3();
-          box.getSize(size);
-          const maxDim = Math.max(size.x, size.y, size.z);
-          // cameraRef.current?.position.set(maxDim * 1.5, maxDim * 1.5, maxDim * 1.5);
-          // cameraRef.current?.lookAt(0, size.y / 2, 0);
-          cameraRef.current?.position.set(60, 60, 60);
-          cameraRef.current?.lookAt(0, 0, 0);
-          console.log('[Viewer] Camera repositioned for new mesh: ', processedMesh);
-          onMeshLoaded(processedMesh);
-      }
-    };
+    } else {
+        // Assume OBJ
+        const loader = new OBJLoader();
+        const reader = new FileReader();
 
-    reader.readAsText(objFile);
+        reader.onload = (e) => {
+            const result = e.target?.result as string;
+            if (!result) return;
+            const object = loader.parse(result);
+            
+            let mainMesh: THREE.Mesh | null = null;
+            // Find the first mesh for processing (legacy logic for OBJ voxelization)
+            object.traverse((child) => {
+                if (!mainMesh && (child as THREE.Mesh).isMesh) {
+                    mainMesh = child as THREE.Mesh;
+                }
+            });
+
+            if (mainMesh) {
+                // Process the mesh: Clean, Fix, Center, Auto-scale
+                const processedMesh = processMesh(mainMesh as THREE.Mesh);
+
+                // Apply wireframe material for OBJ visualization (as requested in original features)
+                processedMesh.material = new THREE.MeshStandardMaterial({ 
+                    color: 0xff0000, 
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.FrontSide
+                });
+
+                const group = new THREE.Group();
+                group.add(processedMesh);
+                meshRef.current = group;
+                sceneRef.current?.add(group);
+                
+                cameraRef.current?.position.set(60, 60, 60);
+                cameraRef.current?.lookAt(0, 0, 0);
+                console.log('[Viewer] OBJ processed and loaded');
+                onMeshLoaded(processedMesh);
+            }
+        };
+        reader.readAsText(objFile);
+    }
+
   }, [objFile]);
 
   // Handle Voxel Rendering from JSON structure
@@ -236,9 +261,7 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     if (!mpdBricks || mpdBricks.length === 0) return;
 
     const group = new THREE.Group();
-
-    const TARGET_SIZE = 40; // Keep in sync with meshProcessor normalization
-
+    const TARGET_SIZE = 40; 
     const height = brickType === 'plate' ? LDRAW_PLATE_HEIGHT : LDRAW_BRICK_HEIGHT;
     const gap = 0.98;
     const geom = new THREE.BoxGeometry(
@@ -266,7 +289,6 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       const instanced = new THREE.InstancedMesh(geom, material, list.length);
       const dummy = new THREE.Object3D();
       list.forEach((b, i) => {
-        // Place cube centered at brick position; add half height on Y so bottom rests on Y=0 before normalization
         dummy.position.set(
           b.x,
           -b.y - height / 2, // Flip Y-axis
@@ -275,14 +297,12 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
         dummy.updateMatrix();
         instanced.setMatrixAt(i, dummy.matrix);
 
-        // Update bounds (use center +/- half extents)
+        // Update bounds
         const halfX = (LDRAW_UNIT_WIDTH * gap) / 2;
-        const halfY = (height * gap) / 2;
         const halfZ = (LDRAW_UNIT_WIDTH * gap) / 2;
         minX = Math.min(minX, b.x - halfX); maxX = Math.max(maxX, b.x + halfX);
-        // minY = Math.min(minY, b.y);       maxY = Math.max(maxY, b.y + height);
-        minY = Math.min(minY, -b.y - height); // 底部是 -b.y - height
-        maxY = Math.max(maxY, -b.y);         // 顶部是 -b.y
+        minY = Math.min(minY, -b.y - height);
+        maxY = Math.max(maxY, -b.y);
         minZ = Math.min(minZ, b.z - halfZ); maxZ = Math.max(maxZ, b.z + halfZ);
       });
       instanced.castShadow = true;
@@ -290,7 +310,7 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
       group.add(instanced);
     });
 
-    // Normalize MPD group to match processed mesh normalization (TARGET_SIZE, centered XZ, bottom at 0)
+    // Normalize MPD group
     const sizeX = maxX - minX;
     const sizeY = maxY - minY;
     const sizeZ = maxZ - minZ;
@@ -308,7 +328,6 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     mpdGroupRef.current = group;
     sceneRef.current.add(group);
 
-    // Frame camera to fit normalized MPD
     if (cameraRef.current) {
       const maxDim = mpdMaxDim > 0 ? TARGET_SIZE : 100;
       const center = new THREE.Vector3(0, (maxY - minY) / 2, 0);

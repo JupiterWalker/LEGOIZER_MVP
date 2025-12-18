@@ -3,6 +3,29 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const TARGET_SIZE = 40; // Normalize loaded models to this size for consistent viewing/voxelization
 
+export const normalizeScene = (object: THREE.Object3D, targetSize: number = TARGET_SIZE) => {
+  const box = new THREE.Box3().setFromObject(object);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+
+  if (maxDim > 0) {
+      const scaleFactor = targetSize / maxDim;
+      object.scale.set(scaleFactor, scaleFactor, scaleFactor);
+  }
+
+  // Update box after scale to center it correctly
+  object.updateMatrixWorld(true);
+  box.setFromObject(object);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  
+  // Center X/Z and sit on Y=0
+  object.position.x = -center.x;
+  object.position.z = -center.z;
+  object.position.y = -box.min.y;
+};
+
 export const processMesh = (mesh: THREE.Mesh): THREE.Mesh => {
   let geometry = mesh.geometry;
 
@@ -83,11 +106,9 @@ export const processMesh = (mesh: THREE.Mesh): THREE.Mesh => {
 
   // 6. Normalize Scale (Auto-Scale)
   // Ensure the model isn't too small or too huge by scaling it to TARGET_SIZE
-  console.log('[processMesh] vertex count:', newPos.length / 3);
   if (geometry.boundingBox) {
     const size = new THREE.Vector3();
     geometry.boundingBox.getSize(size);
-    console.log('[processMesh] bbox size:', size);
     const maxDim = Math.max(size.x, size.y, size.z);
     
     if (maxDim > 0) {
