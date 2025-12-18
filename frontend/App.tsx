@@ -80,26 +80,27 @@ export default function App() {
         setMpdFilename(null);
         setMpdDownloadUrl(null);
         setMpdBricks(null);
+        setIsDone(false);
 
-        try {
-            const selectedColor = LEGO_COLORS.find(c => c.code === settings.colorCode) || LEGO_COLORS[0];
-            const newVoxels = voxelizeMesh(
-                mesh,
-                settings.resolution,
-                selectedColor.hex,
-                settings.brickType
-            );
+        // try {
+        //     const selectedColor = LEGO_COLORS.find(c => c.code === settings.colorCode) || LEGO_COLORS[0];
+        //     const newVoxels = voxelizeMesh(
+        //         mesh,
+        //         settings.resolution,
+        //         selectedColor.hex,
+        //         settings.brickType
+        //     );
 
-            const meshSize = 40;
-            const newGridSize = meshSize / settings.resolution;
+        //     const meshSize = 40;
+        //     const newGridSize = meshSize / settings.resolution;
 
-            setVoxels(newVoxels);
-            setGridSize(newGridSize);
-            setShowOriginal(true);
-        } catch (error) {
-            console.error('Voxelization failed', error);
-            alert('Voxelization failed.');
-        }
+        //     setVoxels(newVoxels);
+        //     setGridSize(newGridSize);
+        //     setShowOriginal(true);
+        // } catch (error) {
+        //     console.error('Voxelization failed', error);
+        //     alert('Voxelization failed.');
+        // }
 
         try {
             const formData = new FormData();
@@ -144,7 +145,7 @@ export default function App() {
                 const bricks = parseMpdInstances(text);
                 setMpdBricks(bricks);
                 // Hide client-side voxel overlay in favor of MPD result
-                setVoxels([]);
+                setVoxels(bricks);
                 setShowOriginal(true);
             } catch (parseErr) {
                 console.warn('Failed to parse MPD content, falling back to client voxels', parseErr);
@@ -223,31 +224,15 @@ export default function App() {
             </label>
           </section>
 
-           {/* Scene Settings */}
-           {/* <section>
-             <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-4 flex items-center gap-2">
-                <Sun className="w-4 h-4" /> Scene
-             </h2>
-             <div>
-                <label className="block text-xs text-neutral-400 mb-1">Light Angle</label>
-                <div className="flex items-center gap-2">
-                    <input 
-                        type="range" min="0" max="360"
-                        value={lightRotation}
-                        onChange={(e) => setLightRotation(parseInt(e.target.value))}
-                        className="flex-1 h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-                    />
-                </div>
-             </div>
-          </section> */}
 
           {/* Voxel Settings */}
           <section>
+            <div className="pt-4 border-t border-neutral-800 space-y-3">
              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-4 flex items-center gap-2">
-                <Settings className="w-4 h-4" /> Config
+                {/* <Settings className="w-4 h-4" /> Config */}
+                2. Config
              </h2>
              
-             <div className="space-y-5">
                 {/* Element Type */}
                 <div>
                    <label className="block text-xs text-neutral-400 mb-2">Brick Type</label>
@@ -318,8 +303,8 @@ export default function App() {
           </section>
 
           {/* Actions */}
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">2. Process</h2>
+          <div className="pt-4 border-t border-neutral-800 space-y-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">3. Process</h2>
             <button
                 onClick={handleVoxelizeGeometric}
                 disabled={!mesh || isProcessing}
@@ -330,10 +315,28 @@ export default function App() {
             </button>
           </div>
 
+          {/* Scene Settings */}
+           {/* <section>
+             <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-4 flex items-center gap-2">
+                <Sun className="w-4 h-4" /> Scene
+             </h2>
+             <div>
+                <label className="block text-xs text-neutral-400 mb-1">Light Angle</label>
+                <div className="flex items-center gap-2">
+                    <input 
+                        type="range" min="0" max="360"
+                        value={lightRotation}
+                        onChange={(e) => setLightRotation(parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                    />
+                </div>
+             </div>
+          </section> */}
+
           {/* Export */}
             {isDone && (
                 <div className="pt-4 border-t border-neutral-800 space-y-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">3. Export</h2>
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">4. Export</h2>
 
                     <div className="flex gap-2">
                         {/* <button
@@ -343,10 +346,11 @@ export default function App() {
                             <FileJson className="w-4 h-4" /> JSON
                         </button> */}
                         <button
+                            disabled={!mpdDownloadUrl && voxels.length === 0}
                             onClick={handleExportLdr}
                             className="flex-1 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg font-bold text-sm flex items-center justify-center gap-2"
                         >
-                            <Download className="w-4 h-4" /> {mpdDownloadUrl ? 'MPD' : 'LDR'}
+                            {!mpdDownloadUrl && voxels.length === 0 ? <RefreshCw className="animate-spin w-4 h-4"/> : <Download className="w-4 h-4" />} MPD
                         </button>
                     </div>
                     {mpdDownloadUrl && (
@@ -371,19 +375,32 @@ export default function App() {
     </div>
 
       {/* Main Viewport */}
-      <div className="flex-1 relative">
-         <div className="absolute top-4 left-4 z-10 flex gap-2">
-            <button 
+    <div className="flex-1 relative">
+        <div className="absolute top-4 left-4 z-10 flex gap-4">
+            <button
                 onClick={() => setShowOriginal(!showOriginal)}
                 className="bg-neutral-800/80 backdrop-blur text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-2 border border-neutral-700 hover:bg-neutral-700"
             >
-                {showOriginal ? <Eye className="w-4 h-4"/> : <EyeOff className="w-4 h-4"/>}
+                {showOriginal ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 {showOriginal ? "Hide Original" : "Show Original"}
             </button>
+
             <div className="bg-neutral-800/80 backdrop-blur text-neutral-400 px-3 py-1.5 rounded-md text-sm border border-neutral-700">
                 Voxels: {voxels.length}
             </div>
-         </div>
+
+            <div className="">
+                <label className="block text-xs text-neutral-400 mb-1">Light Angle</label>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="range" min="0" max="360"
+                        value={lightRotation}
+                        onChange={(e) => setLightRotation(parseInt(e.target.value))}
+                        className="flex-1 h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+                    />
+                </div>
+            </div>
+        </div>
 
          <Viewer 
             ref={viewerRef}

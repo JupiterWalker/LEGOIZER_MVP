@@ -2,7 +2,8 @@
 import argparse
 from pathlib import Path
 
-from legoizer.pipeline import generate_mpd_report
+from backend.pipeline import generate_mpd_report
+
 
 def parse_args():
     """

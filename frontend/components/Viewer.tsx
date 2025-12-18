@@ -216,73 +216,7 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
         });
         voxelGroupRef.current = null;
     }
-
-    if (voxels.length === 0) return;
-
-    const group = new THREE.Group();
-    // Scale the entire group to match the original mesh dimensions
-    // Since voxels are normalized integers, multiplying by gridSize restores the world scale
-    group.scale.set(gridSize, gridSize, gridSize);
-
-    // Compute voxel index bounds so we can center the grid around (0,0)
-    let minX = Infinity, maxX = -Infinity;
-    let minZ = Infinity, maxZ = -Infinity;
-    voxels.forEach(v => {
-      if (v.x < minX) minX = v.x;
-      if (v.x > maxX) maxX = v.x;
-      if (v.z < minZ) minZ = v.z;
-      if (v.z > maxZ) maxZ = v.z;
-    });
-
-    const centerXIndex = (minX + maxX + 1) / 2; // +0.5 cell center baked in
-    const centerZIndex = (minZ + maxZ + 1) / 2;
-    
-    // Geometry Definition
-    const heightRatio = brickType === 'plate' ? PLATE_HEIGHT_RATIO : BRICK_HEIGHT_RATIO;
-    const gapScale = 0.95;
-    const geometry = new THREE.BoxGeometry(
-        1 * gapScale, 
-        heightRatio * gapScale, 
-        1 * gapScale
-    );
-    
-    // Group voxels by Color Hex for instancing efficiency
-    const colorGroups = new Map<string, VoxelStruct[]>();
-    voxels.forEach(v => {
-        if(!colorGroups.has(v.c)) colorGroups.set(v.c, []);
-        colorGroups.get(v.c)?.push(v);
-    });
-
-    colorGroups.forEach((voxelList, hexColor) => {
-        const material = new THREE.MeshStandardMaterial({ 
-            color: hexColor,
-            roughness: 0.4,
-            metalness: 0.1
-        });
-        
-          const instancedMesh = new THREE.InstancedMesh(geometry, material, voxelList.length);
-        const dummy = new THREE.Object3D();
-
-        // Adjust voxel rendering Y-axis
-        voxelList.forEach((v, i) => {
-            dummy.position.set(
-                v.x + 0.5 - centerXIndex,
-                -v.y * heightRatio - (heightRatio / 2), // Flip Y-axis
-                v.z + 0.5 - centerZIndex
-            );
-            dummy.updateMatrix();
-            instancedMesh.setMatrixAt(i, dummy.matrix);
-        });
-        
-        instancedMesh.castShadow = true;
-        instancedMesh.receiveShadow = true;
-        group.add(instancedMesh);
-    });
-
-    voxelGroupRef.current = group;
-    sceneRef.current.add(group);
-
-  }, [voxels, brickType, gridSize]); 
+  }, [brickType, gridSize]); 
 
   // Handle MPD brick rendering (if provided)
   useEffect(() => {

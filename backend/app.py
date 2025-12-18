@@ -17,7 +17,8 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from legoizer.pipeline import generate_mpd_report
+from backend.pipeline import generate_mpd_report
+from backend.utils import StageTimer
 
 app = FastAPI(title="Legoizer API", version="0.1.0")
 
@@ -55,39 +56,54 @@ async def process_model(
     if suffix not in SUPPORTED_INPUTS:
         raise HTTPException(status_code=415, detail="Only OBJ and DAE inputs are supported")
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        working_dir = Path(tmpdir)
-        input_path = working_dir / Path(file.filename).name
-        input_bytes = await file.read()
-        with open(input_path, "wb") as buffer:
-            buffer.write(input_bytes)
+    mpd_path: Optional[Path] = None
+    result: dict = {}
 
-        mtl_path = None
-        if mtl and mtl.filename:
-            mtl_path = working_dir / Path(mtl.filename).name
-            mtl_bytes = await mtl.read()
-            with open(mtl_path, "wb") as buffer:
-                buffer.write(mtl_bytes)
+    with StageTimer("total request"):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            working_dir = Path(tmpdir)
+            input_path = working_dir / Path(file.filename).name
 
-        output_dir = working_dir / "result"
-        output_path = output_dir / f"{input_path.stem}.mpd"
+            with StageTimer("read input bytes"):
+                input_bytes = await file.read()
 
-        result = generate_mpd_report(
-            input_path=input_path,
-            output_path=output_path,
-            unit=unit,
-            part=part,
-            max_dim_limit=max_dim_limit,
-            mtl_path=mtl_path,
-            default_color=default_color,
-            color_mode=color_mode,
-            surface_thickness_mm=surface_thickness_mm,
-        )
+            with StageTimer("write input file"):
+                with open(input_path, "wb") as buffer:
+                    buffer.write(input_bytes)
 
-        temp_mpd = tempfile.NamedTemporaryFile(delete=False, suffix=".mpd")
-        temp_mpd.close()
-        mpd_path = Path(temp_mpd.name)
-        shutil.copyfile(result["mpd_path"], mpd_path)
+            mtl_path = None
+            if mtl and mtl.filename:
+                mtl_path = working_dir / Path(mtl.filename).name
+                with StageTimer("read mtl bytes"):
+                    mtl_bytes = await mtl.read()
+                with StageTimer("write mtl file"):
+                    with open(mtl_path, "wb") as buffer:
+                        buffer.write(mtl_bytes)
+
+            output_dir = working_dir / "result"
+            output_path = output_dir / f"{input_path.stem}.mpd"
+
+            with StageTimer("generate_mpd_report"):
+                result = generate_mpd_report(
+                    input_path=input_path,
+                    output_path=output_path,
+                    unit=unit,
+                    part=part,
+                    max_dim_limit=max_dim_limit,
+                    mtl_path=mtl_path,
+                    default_color=default_color,
+                    color_mode=color_mode,
+                    surface_thickness_mm=surface_thickness_mm,
+                )
+
+            temp_mpd = tempfile.NamedTemporaryFile(delete=False, suffix=".mpd")
+            temp_mpd.close()
+            mpd_path = Path(temp_mpd.name)
+            with StageTimer("copy mpd to temp"):
+                shutil.copyfile(result["mpd_path"], mpd_path)
+
+    if mpd_path is None:
+        raise RuntimeError("Temporary MPD path was not created")
 
     background_tasks.add_task(mpd_path.unlink)
 
@@ -99,3 +115,8 @@ async def process_model(
     )
     response.headers["X-Legoizer-Metadata"] = json.dumps(result.get("metadata", {}))
     return response
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
