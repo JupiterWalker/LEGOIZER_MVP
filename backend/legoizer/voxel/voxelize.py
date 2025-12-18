@@ -3,9 +3,9 @@ import numpy as np
 import trimesh
 
 # LEGO geometry
-STUD_MM = 8.0
-PLATE_MM = 3.2
-BRICK_MM = 9.6
+STUD_MM  = 8.0  # 1*1 plate and brick footprint size in mm
+PLATE_MM = 3.2  # height of 1x1 plate in mm
+BRICK_MM = 9.6  # height of 1x1 brick in mm
 
 PARTS = {
     'plate_1x1': {'ldraw_id': 3024, 'height_mm': PLATE_MM, 'footprint': (1, 1)},
@@ -32,13 +32,13 @@ def mesh_to_voxels(mesh: trimesh.Trimesh, part_key: str):
 
     # 各向同性缩放，使 Z 的单位从 h(mm) 拉伸到 STUD_MM(mm)
     s = STUD_MM / h
-    S = np.diag([1.0, 1.0, s, 1.0])      # 先将 mesh 缩放到 iso 空间
-    Si = np.linalg.inv(S)                # 把 iso 空间坐标还原到真实 mm
+    S = np.diag([1.0, 1.0, s, 1.0])      # 定义三维顶点的仿射变换矩阵, 把它理解为“如何把原网格变到各向同性空间的规则”
+    Si = np.linalg.inv(S)                # 还原回真实毫米空间的变换矩阵
 
     mesh_iso = mesh.copy()
-    mesh_iso.apply_transform(S)   # 把原模型 变形
+    mesh_iso.apply_transform(S)   # 把原三维网格模型 变形
 
-    vox = mesh_iso.voxelized(pitch=STUD_MM)  # iso 空间下的等边体素，单位 mm
+    vox = mesh_iso.voxelized(pitch=STUD_MM)  # 使用长宽高为 STUD_MM 的体素打散 三维网格模型, 也就是体素化
 
     # 这行代码调用了 trimesh的体素对象vox的fill()
     # 方法，将体素网格中被包围的空洞填充，
@@ -46,10 +46,11 @@ def mesh_to_voxels(mesh: trimesh.Trimesh, part_key: str):
     # 这样可以确保体素化结果内部没有空洞，适合后续的布尔体素处理。
     filled = vox.fill()
 
-    grid = filled.matrix.astype(bool)
+    grid = filled.matrix.astype(bool)  # 获取体素矩阵，转换为布尔类型
+
     # filled.transform: [i,j,k,1] -> iso 空间体素中心（单位 mm）
     # 回到真实 mm：Si @ (iso_center)
-    index_to_mm_center = Si @ filled.transform
+    index_to_mm_center = Si @ filled.transform 
 
     return grid, index_to_mm_center
 

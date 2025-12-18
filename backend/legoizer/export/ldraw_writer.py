@@ -71,9 +71,3 @@ def write_mpd(out_path: str,
 
     with open(out_path, 'w') as f:
         f.write('\n'.join(lines))
-
-    # 报告
-    report_path = os.path.splitext(out_path)[0] + '_report.json'
-    with open(report_path, 'w') as f:
-        json.dump(stats, f, indent=2)
-    return report_path

@@ -56,7 +56,7 @@ def generate_mpd_report(
         )
 
     with StageTimer("write mpd"):
-        report_path = write_mpd(
+        write_mpd(
             str(output_path),
             part,
             placements,
@@ -65,23 +65,9 @@ def generate_mpd_report(
             colors=colors,
             default_color=default_color,
         )
-    with StageTimer("write report"):
-        mins, maxs = grid_bounds_mm(grid, index_to_mm_center)
-        dims_mm = (maxs - mins).tolist()
-
-        with open(report_path, "r") as handle:
-            data = json.load(handle)
-
-        data["dims_mm_xyz"] = [round(value, 3) for value in dims_mm]
-        data["voxels"] = int(grid.sum())
-
-        with open(report_path, "w") as handle:
-            json.dump(data, handle, indent=2)
 
     return {
         "mpd_path": str(output_path),
-        "report_path": report_path,
-        "metadata": data,
     }
 
 
