@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -12,7 +11,9 @@ from .legoizer.io.gltf_loader import load_gltf
 from .legoizer.planner.colorize import colorize_voxels
 from .legoizer.planner.tiler import tile_single_part_1x1, compute_stats_1x1
 from .legoizer.reporting.summary import Report
-from .legoizer.voxel.voxelize import mesh_to_voxels, grid_bounds_mm
+from .legoizer.voxel.voxelize import mesh_to_voxels
+from .postprocess.mpd_optimizer import optimize_mpd_file
+from .postprocess.opt_from_tencent import merge_1x1_to_larger
 
 
 def generate_mpd_report(
@@ -40,9 +41,6 @@ def generate_mpd_report(
     
     with StageTimer("tile single part 1x1"):
         placements = tile_single_part_1x1(grid)
-
-    stats = compute_stats_1x1(placements)
-    report_payload = Report(part=part, count=stats["count"]).to_dict()
 
     colors = None
     effective_mode = (color_mode or "none").lower()
@@ -77,10 +75,17 @@ def generate_mpd_report(
             part,
             placements,
             index_to_mm_center,
-            report_payload,
             colors=colors,
             default_color=default_color,
         )
+
+    with StageTimer("optimize mpd"):
+        optimize_mpd_file(Path(output_path), part)
+        # merge_1x1_to_larger(
+        #     mpd_path=str(output_path),
+        #     out_path=str(output_path),
+        #     stability=False,
+        # )
 
     return {
         "mpd_path": str(output_path),

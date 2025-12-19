@@ -1,7 +1,6 @@
 # legoizer/export/ldraw_writer.py
 from typing import List, Tuple
 import numpy as np
-import json
 import os
 
 # LDraw color: Light Bluish Gray = 71
@@ -46,7 +45,6 @@ def write_mpd(out_path: str,
               part_key: str,
               placements: List[Tuple[int,int,int]],
               index_to_mm_center: np.ndarray,
-              stats: dict,
               colors: list = None,
               default_color: int = DEFAULT_COLOR):
     os.makedirs(os.path.dirname(out_path) or '.', exist_ok=True)
