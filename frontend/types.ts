@@ -21,6 +21,13 @@ export interface LegoColor {
 
 export type BrickType = 'brick' | 'plate';
 
+export interface PartDefinition {
+  part: string;
+  family: BrickType;
+  studsX: number;
+  studsY: number;
+}
+
 export interface ProcessingSettings {
   resolution: number; // Grid size on the longest axis
   colorCode: number;
@@ -41,4 +48,6 @@ export interface MpdBrick {
   z: number; // LDraw units
   colorCode: number; // LDraw color code
   colorHex?: string; // Resolved hex when direct colour is present
+  part: string;
+  rotation: number[];
 }

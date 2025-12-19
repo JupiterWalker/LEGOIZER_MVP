@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VoxelStruct, BrickType, MpdBrick } from '../types';
-import { BRICK_HEIGHT_RATIO, PLATE_HEIGHT_RATIO, LDRAW_UNIT_WIDTH, LDRAW_BRICK_HEIGHT, LDRAW_PLATE_HEIGHT, LEGO_COLORS } from '../constants';
+import { LDRAW_UNIT_WIDTH, LDRAW_BRICK_HEIGHT, LDRAW_PLATE_HEIGHT, LEGO_COLORS, LEGO_COLOR_MAP, resolvePartDefinition } from '../constants';
 import { processMesh, normalizeScene } from '../utils/meshProcessor';
 
 interface ViewerProps {
@@ -262,18 +262,29 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     if (!mpdBricks || mpdBricks.length === 0) return;
 
     const group = new THREE.Group();
-    const TARGET_SIZE = 40; 
-    const height = brickType === 'plate' ? LDRAW_PLATE_HEIGHT : LDRAW_BRICK_HEIGHT;
+    const TARGET_SIZE = 40;
     const gap = 0.98;
-    const geom = new THREE.BoxGeometry(
-      LDRAW_UNIT_WIDTH * gap,
-      height * gap,
-      LDRAW_UNIT_WIDTH * gap
-    );
+    const identityRotation = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const localCorners = [
+      new THREE.Vector3(-0.5, -0.5, -0.5),
+      new THREE.Vector3(0.5, -0.5, -0.5),
+      new THREE.Vector3(-0.5, 0.5, -0.5),
+      new THREE.Vector3(0.5, 0.5, -0.5),
+      new THREE.Vector3(-0.5, -0.5, 0.5),
+      new THREE.Vector3(0.5, -0.5, 0.5),
+      new THREE.Vector3(-0.5, 0.5, 0.5),
+      new THREE.Vector3(0.5, 0.5, 0.5),
+    ];
+    const transformed = new THREE.Vector3();
+    const rotationMatrix = new THREE.Matrix4();
+    const quaternion = new THREE.Quaternion();
 
     const resolveBrickHex = (brick: MpdBrick): string => {
       if (brick.colorHex) return brick.colorHex;
-      return LEGO_COLORS.find(c => c.code === brick.colorCode)?.hex || '#FFFFFF';
+      const key = String(brick.colorCode);
+      const direct = LEGO_COLOR_MAP[key];
+      if (direct) return direct;
+      return LEGO_COLORS.find(c => c.code === brick.colorCode)?.hex || '#ffffff';
     };
 
     // Group bricks by resolved colour string so instancing can reuse materials.
@@ -292,27 +303,54 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
 
     colourBuckets.forEach((list, hex) => {
       const material = new THREE.MeshStandardMaterial({ color: hex, roughness: 0.4, metalness: 0.1 });
-      const instanced = new THREE.InstancedMesh(geom, material, list.length);
+      const geometry = new THREE.BoxGeometry(1, 1, 1);
+      const instanced = new THREE.InstancedMesh(geometry, material, list.length);
       const dummy = new THREE.Object3D();
+      const rotationArray = identityRotation;
       list.forEach((b, i) => {
+        const definition = resolvePartDefinition(b.part);
+        const studsX = definition?.studsX ?? 1;
+        const studsY = definition?.studsY ?? 1;
+        const family = definition?.family ?? brickType;
+        const unitWidth = studsX * LDRAW_UNIT_WIDTH;
+        const unitDepth = studsY * LDRAW_UNIT_WIDTH;
+        const baseHeight = family === 'plate' ? LDRAW_PLATE_HEIGHT : LDRAW_BRICK_HEIGHT;
+        const width = unitWidth * gap;
+        const depth = unitDepth * gap;
+        const height = baseHeight * gap;
+
+        const rotationValues = b.rotation && b.rotation.length === 9 ? b.rotation : rotationArray;
+        rotationMatrix.set(
+          rotationValues[0], rotationValues[1], rotationValues[2], 0,
+          rotationValues[3], rotationValues[4], rotationValues[5], 0,
+          rotationValues[6], rotationValues[7], rotationValues[8], 0,
+          0, 0, 0, 1
+        );
+        quaternion.setFromRotationMatrix(rotationMatrix);
+
         dummy.position.set(
           b.x,
-          -b.y - height / 2, // Flip Y-axis
+          -b.y - height / 2,
           b.z
         );
+        dummy.quaternion.copy(quaternion);
+        dummy.scale.set(width, height, depth);
         dummy.updateMatrix();
         instanced.setMatrixAt(i, dummy.matrix);
 
-        // Update bounds
-        const halfX = (LDRAW_UNIT_WIDTH * gap) / 2;
-        const halfZ = (LDRAW_UNIT_WIDTH * gap) / 2;
-        minX = Math.min(minX, b.x - halfX); maxX = Math.max(maxX, b.x + halfX);
-        minY = Math.min(minY, -b.y - height);
-        maxY = Math.max(maxY, -b.y);
-        minZ = Math.min(minZ, b.z - halfZ); maxZ = Math.max(maxZ, b.z + halfZ);
+        for (const corner of localCorners) {
+          transformed.copy(corner).applyMatrix4(dummy.matrix);
+          if (transformed.x < minX) minX = transformed.x;
+          if (transformed.x > maxX) maxX = transformed.x;
+          if (transformed.y < minY) minY = transformed.y;
+          if (transformed.y > maxY) maxY = transformed.y;
+          if (transformed.z < minZ) minZ = transformed.z;
+          if (transformed.z > maxZ) maxZ = transformed.z;
+        }
       });
       instanced.castShadow = true;
       instanced.receiveShadow = true;
+      instanced.instanceMatrix.needsUpdate = true;
       group.add(instanced);
     });
 
@@ -337,7 +375,8 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
 
     if (cameraRef.current) {
       const maxDim = mpdMaxDim > 0 ? TARGET_SIZE : 100;
-      const center = new THREE.Vector3(0, (maxY - minY) / 2, 0);
+      const scaledCenterY = mpdMaxDim > 0 ? (sizeY * TARGET_SIZE) / (2 * mpdMaxDim) : (maxY - minY) / 2;
+      const center = new THREE.Vector3(0, scaledCenterY, 0);
       cameraRef.current.position.set(center.x + maxDim * 1.5, center.y + maxDim * 1.5, center.z + maxDim * 1.5);
       cameraRef.current.lookAt(center);
     }

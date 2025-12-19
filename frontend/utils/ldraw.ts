@@ -32,8 +32,16 @@ export function parseMpdInstances(text: string): MpdBrick[] {
     const y = parseFloat(parts[3]);
     const z = parseFloat(parts[4]);
 
+    const rotationTokens = parts.slice(5, 14).map((token) => parseFloat(token));
+    const rotation = rotationTokens.length === 9 && rotationTokens.every((value) => Number.isFinite(value))
+      ? rotationTokens
+      : [1, 0, 0, 0, 1, 0, 0, 0, 1];
+
+    const partTokens = parts.slice(14);
+    const part = partTokens.join(' ');
+
     if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) && Number.isFinite(colorCode)) {
-      bricks.push({ x, y, z, colorCode, colorHex });
+      bricks.push({ x, y, z, colorCode, colorHex, part, rotation });
     }
   }
   return bricks;
