@@ -46,6 +46,8 @@ for descriptor, part_no in PART_LIBRARY.items():
 
 import math
 
+AXIS_SWITCH_UNIT = 48.0  # LDU multiplier for deciding merge axis by layer height
+
 
 def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
     """将十六进制颜色代码转换为RGB元组"""
@@ -157,19 +159,27 @@ def get_part_size_from_name(part_type: str) -> Tuple[int, int]:
 
 def group_by_color_and_position(components: Iterable[Dict[str, object]], axis: int = 0) -> Dict[Tuple[str, float, float], List[Dict[str, object]]]:
     grouped: Dict[Tuple[str, float, float], List[Dict[str, object]]] = defaultdict(list)
-    other_axis = 1 if axis == 0 else 0
+    other_axis = 2 if axis == 0 else 0
     for comp in components:
         position = comp["position"]
         color = comp["color"]
         key = (
-            color,
-            round(position[2], 3),
-            round(position[other_axis], 3),
+            color,  # 同颜色
+            round(position[1], 3),  # 同高度
+            round(position[other_axis], 3),  # 同另一轴位置
         )
         grouped[key].append(comp)
     for key in grouped:
         grouped[key].sort(key=lambda item: item["position"][axis])
     return grouped
+
+
+def _axis_for_layer(layer_height: float) -> int:
+    """Determine merge axis per layer height.
+
+    Even multiples of AXIS_SWITCH_UNIT merge along X; odd multiples along Y; other heights default to Y.
+    """
+    return 0 if layer_height % AXIS_SWITCH_UNIT == 0 else 2
 
 
 def _are_adjacent(prev_comp: Dict[str, object], next_comp: Dict[str, object], axis: int, axis_studs: int) -> bool:
@@ -198,7 +208,7 @@ def _available_lengths_for_axis(
             continue
         if axis == 0 and studs_y == other_axis_studs:
             lengths.add(studs_x)
-        elif axis == 1 and studs_x == other_axis_studs:
+        elif axis == 2 and studs_x == other_axis_studs:
             lengths.add(studs_y)
     return sorted(lengths, reverse=True)
 
@@ -212,16 +222,20 @@ def _build_combined_component(
     last = segment[-1]
     position = list(first["position"])
     position[axis] = (first["position"][axis] + last["position"][axis]) / 2.0
+    if axis == 2:
+        rotation = (0.0, 0.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, 0.0)
+    else:
+        rotation = first["rotation"]
     new_line = format_type1_line(
         first["color"],
         (position[0], position[1], position[2]),
-        first["rotation"],
+        rotation,
         part_no,
     )
     return {
         "color": first["color"],
         "position": (position[0], position[1], position[2]),
-        "rotation": first["rotation"],
+        "rotation": rotation,
         "part_type": part_no,
         "original_line": new_line,
     }
@@ -287,7 +301,7 @@ def merge_in_line(components: List[Dict[str, object]], axis: int, part_type: str
         raise ValueError(f"Unsupported part type: {part_type}")
     family, studs_x, studs_y = descriptor
     axis_studs = studs_x if axis == 0 else studs_y
-    if axis not in (0, 1):
+    if axis not in (0, 2):
         raise ValueError("Only X and Y axes are supported for merging")
     merged: List[Dict[str, object]] = []
     if not components:
@@ -303,7 +317,7 @@ def merge_in_line(components: List[Dict[str, object]], axis: int, part_type: str
     return merged
 
 
-def optimize_mpd_file(file_path: Path | str, part_type: str, axis: int = 0) -> None:
+def optimize_mpd_file(file_path: Path | str, part_type: str, axis: int | None = None) -> None:
     path = Path(file_path)
     if not path.exists():
         raise FileNotFoundError(path)
@@ -314,20 +328,27 @@ def optimize_mpd_file(file_path: Path | str, part_type: str, axis: int = 0) -> N
         original_lines = handle.readlines()
     components: List[Dict[str, object]] = []
     target_indexes = set()
+    layers: Dict[float, List[Dict[str, object]]] = defaultdict(list)
     for index, line in enumerate(original_lines):
         parsed = parse_mpd_line(line.strip())
         if parsed and parsed["part_type"].lower() == target_part.lower():
             parsed["line_index"] = index
             components.append(parsed)
             target_indexes.add(index)
+            layer_height = round(parsed["position"][1], 3)
+            parsed["layer_height"] = layer_height
+            layers[layer_height].append(parsed)
         else:
             print(f"Skipping line {index}: not target part")
     if not components:
         return
-    grouped = group_by_color_and_position(components, axis=axis)
     optimized: List[Dict[str, object]] = []
-    for group in grouped.values():
-        optimized.extend(merge_in_line(group, axis, part_type))
+    for layer_height, layer_components in layers.items():
+        current_axis = axis if axis in (0, 2) else _axis_for_layer(layer_height)
+        # current_axis = _axis_for_layer(layer_height)
+        grouped = group_by_color_and_position(layer_components, axis=current_axis)
+        for group in grouped.values():
+            optimized.extend(merge_in_line(group, current_axis, part_type))
     made_changes = any(
         "line_index" not in comp or comp["part_type"].lower() != target_part.lower()
         for comp in optimized

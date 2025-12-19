@@ -18,7 +18,8 @@ class TestParsing(unittest.TestCase):
         line = _make_line(0, 0, 0)
         parsed = opt.parse_mpd_line(line)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["color"], "21")
+        expected_color = opt.match_lego_color(opt.hex_to_rgb("21"))
+        self.assertEqual(parsed["color"], expected_color)
         self.assertEqual(parsed["position"], (0.0, 0.0, 0.0))
         self.assertEqual(parsed["part_type"], "3024.dat")
 
@@ -125,6 +126,38 @@ class TestOptimizeFile(unittest.TestCase):
             result = mpd_path.read_text(encoding="utf-8")
             self.assertNotIn("Optimized components", result)
             self.assertEqual(result.strip(), "\n".join(lines).strip())
+        finally:
+            mpd_path.unlink(missing_ok=True)
+
+    def test_optimize_uses_y_axis_for_non_multiple_layer(self):
+        lines = [
+            "0 FILE model.ldr",
+            _make_line(0.0, 0.0, 20.0),
+            _make_line(0.0, 20.0, 20.0),
+            "0 NOFILE",
+        ]
+        mpd_path = self._write_mpd(lines)
+        try:
+            opt.optimize_mpd_file(mpd_path, "plate_1x1")
+            result = mpd_path.read_text(encoding="utf-8")
+            self.assertIn("3023.dat", result)
+            self.assertNotIn(" 3024.dat\n", result)
+        finally:
+            mpd_path.unlink(missing_ok=True)
+
+    def test_optimize_uses_y_axis_for_odd_multiple_layer(self):
+        lines = [
+            "0 FILE model.ldr",
+            _make_line(0.0, 0.0, 40.0),
+            _make_line(0.0, 20.0, 40.0),
+            "0 NOFILE",
+        ]
+        mpd_path = self._write_mpd(lines)
+        try:
+            opt.optimize_mpd_file(mpd_path, "plate_1x1")
+            result = mpd_path.read_text(encoding="utf-8")
+            self.assertIn("3023.dat", result)
+            self.assertNotIn(" 3024.dat\n", result)
         finally:
             mpd_path.unlink(missing_ok=True)
 
