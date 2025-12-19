@@ -5,6 +5,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
+from backend.postprocess.color_table import COMMON_LDRAW_COLORS, LEGO_COLORS
+
 
 STUD_PITCH_LDU = 20.0
 MERGE_TOLERANCE = 1e-3
@@ -41,6 +43,40 @@ NUMBER_TO_DESCRIPTOR: Dict[str, Tuple[str, int, int]] = {}
 for descriptor, part_no in PART_LIBRARY.items():
     NUMBER_TO_DESCRIPTOR[part_no.lower()] = descriptor
     NUMBER_TO_DESCRIPTOR[part_no.lower().rstrip(".dat")] = descriptor
+
+import math
+
+
+def hex_to_rgb(hex_color: str) -> Tuple[int, int, int]:
+    """将十六进制颜色代码转换为RGB元组"""
+    hex_color = hex_color.lstrip('#').lstrip('0x')
+    
+    # 处理乐高特有的7位颜色代码
+    if len(hex_color) == 7:
+        hex_color = hex_color[1:]  # 移除第一位字符
+    
+    # 确保是6位十六进制
+    if len(hex_color) < 6:
+        hex_color = hex_color.zfill(6)
+    elif len(hex_color) > 6:
+        hex_color = hex_color[-6:]  # 取最后6位
+    
+    try:
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        return (r, g, b)
+    except ValueError:
+        # 解析失败时返回黑色
+        return (0, 0, 0)
+
+def color_distance(c1: Tuple[int, int, int], c2: Tuple[int, int, int]) -> float:
+    """计算两个RGB颜色之间的欧几里得距离"""
+    return math.sqrt(sum((a - b) ** 2 for a, b in zip(c1, c2)))
+
+def match_lego_color(rgb: Tuple[int, int, int]) -> str:
+    """将RGB颜色匹配到最接近的标准乐高颜色"""
+    return min(LEGO_COLORS.items(), key=lambda item: color_distance(rgb, item[1]))[0]
 
 
 def _normalize_token(token: str) -> str:
@@ -92,12 +128,16 @@ def parse_mpd_line(line: str) -> Optional[Dict[str, object]]:
     except ValueError:
         return None
     part_type = tokens[14]
+    rgb = hex_to_rgb(color)
+    lego_color = match_lego_color(rgb)
+    elements = line.split(" ")
+    line_el = f"{elements[0]} {lego_color} {' '.join(elements[2:])}"
     return {
-        "color": color,
+        "color": lego_color,
         "position": (x, y, z),
         "rotation": rotation,
         "part_type": part_type,
-        "original_line": line,
+        "original_line": line_el,
     }
 
 
@@ -280,6 +320,8 @@ def optimize_mpd_file(file_path: Path | str, part_type: str, axis: int = 0) -> N
             parsed["line_index"] = index
             components.append(parsed)
             target_indexes.add(index)
+        else:
+            print(f"Skipping line {index}: not target part")
     if not components:
         return
     grouped = group_by_color_and_position(components, axis=axis)
