@@ -147,6 +147,46 @@ def _are_adjacent(prev_comp: Dict[str, object], next_comp: Dict[str, object], ax
     return prev_comp["color"] == next_comp["color"] and prev_comp["part_type"] == next_comp["part_type"]
 
 
+def _available_lengths_for_axis(
+    family: str,
+    other_axis_studs: int,
+    axis: int,
+) -> List[int]:
+    lengths = set()
+    for (fam, studs_x, studs_y), _ in PART_LIBRARY.items():
+        if fam != family:
+            continue
+        if axis == 0 and studs_y == other_axis_studs:
+            lengths.add(studs_x)
+        elif axis == 1 and studs_x == other_axis_studs:
+            lengths.add(studs_y)
+    return sorted(lengths, reverse=True)
+
+
+def _build_combined_component(
+    segment: List[Dict[str, object]],
+    axis: int,
+    part_no: str,
+) -> Dict[str, object]:
+    first = segment[0]
+    last = segment[-1]
+    position = list(first["position"])
+    position[axis] = (first["position"][axis] + last["position"][axis]) / 2.0
+    new_line = format_type1_line(
+        first["color"],
+        (position[0], position[1], position[2]),
+        first["rotation"],
+        part_no,
+    )
+    return {
+        "color": first["color"],
+        "position": (position[0], position[1], position[2]),
+        "rotation": first["rotation"],
+        "part_type": part_no,
+        "original_line": new_line,
+    }
+
+
 def combine_group(group: List[Dict[str, object]], axis: int, part_type: str) -> List[Dict[str, object]]:
     if len(group) <= 1:
         return group
@@ -156,35 +196,49 @@ def combine_group(group: List[Dict[str, object]], axis: int, part_type: str) -> 
     family, studs_x, studs_y = descriptor
     axis_studs = studs_x if axis == 0 else studs_y
     other_axis_studs = studs_y if axis == 0 else studs_x
-    new_axis_studs = axis_studs * len(group)
-    if axis == 0:
-        target_width, target_depth = new_axis_studs, other_axis_studs
-    elif axis == 1:
-        target_width, target_depth = other_axis_studs, new_axis_studs
-    else:
+    if axis_studs <= 0 or other_axis_studs <= 0:
         return group
-    new_part = _lookup_part_number(family, target_width, target_depth)
-    if not new_part:
+
+    available_lengths = _available_lengths_for_axis(family, other_axis_studs, axis)
+    if not available_lengths:
         return group
-    first = group[0]
-    last = group[-1]
-    position = list(first["position"])
-    position[axis] = (first["position"][axis] + last["position"][axis]) / 2.0
-    new_line = format_type1_line(
-        first["color"],
-        (position[0], position[1], position[2]),
-        first["rotation"],
-        new_part,
-    )
-    return [
-        {
-            "color": first["color"],
-            "position": (position[0], position[1], position[2]),
-            "rotation": first["rotation"],
-            "part_type": new_part,
-            "original_line": new_line,
-        }
-    ]
+
+    result: List[Dict[str, object]] = []
+    idx = 0
+    while idx < len(group):
+        remaining = len(group) - idx
+        chosen_length = None
+        components_needed = 1
+        for length in available_lengths:
+            if length % axis_studs != 0:
+                continue
+            needed = length // axis_studs
+            if needed <= 0 or needed > remaining:
+                continue
+            chosen_length = length
+            components_needed = needed
+            break
+        if chosen_length is None or components_needed <= 1:
+            # 无法合并更大的零件，保留原件
+            result.append(group[idx])
+            idx += 1
+            continue
+
+        segment = group[idx : idx + components_needed]
+        if axis == 0:
+            width, depth = chosen_length, other_axis_studs
+        else:
+            width, depth = other_axis_studs, chosen_length
+        part_no = _lookup_part_number(family, width, depth)
+        if not part_no:
+            # 理论上不会发生，但为安全起见退化
+            result.append(group[idx])
+            idx += 1
+            continue
+        result.append(_build_combined_component(segment, axis, part_no))
+        idx += components_needed
+
+    return result
 
 
 def merge_in_line(components: List[Dict[str, object]], axis: int, part_type: str) -> List[Dict[str, object]]:

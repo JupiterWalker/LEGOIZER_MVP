@@ -75,6 +75,18 @@ class TestMerging(unittest.TestCase):
         with self.assertRaises(ValueError):
             opt.merge_in_line([], axis=0, part_type="unknown")
 
+    def test_merge_in_line_partial_merge_uses_longest_first(self):
+        comps: list[dict[str, object]] = []
+        for idx in range(5):
+            line = _make_line(idx * opt.STUD_PITCH_LDU, 0.0, 0.0)
+            comps.append(opt.parse_mpd_line(line))
+        merged = opt.merge_in_line(comps, axis=0, part_type="plate_1x1")
+        self.assertEqual(len(merged), 2)
+        self.assertEqual(merged[0]["part_type"], "3710.dat")
+        self.assertAlmostEqual(merged[0]["position"][0], 30.0)
+        self.assertEqual(merged[1]["part_type"], "3024.dat")
+        self.assertAlmostEqual(merged[1]["position"][0], 80.0)
+
 
 class TestOptimizeFile(unittest.TestCase):
     def _write_mpd(self, rows: list[str]) -> Path:
