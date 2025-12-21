@@ -76,7 +76,7 @@ interface TranslationContextValue {
 const TranslationContext = createContext<TranslationContextValue | undefined>(undefined);
 
 export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<LanguageCode>('zh');
+  const [language, setLanguageState] = useState<LanguageCode>('en');
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY) as LanguageCode | null;
