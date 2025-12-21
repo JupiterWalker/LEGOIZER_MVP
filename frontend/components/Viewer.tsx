@@ -5,6 +5,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VoxelStruct, BrickType, MpdBrick } from '../types';
 import { LDRAW_UNIT_WIDTH, LDRAW_BRICK_HEIGHT, LDRAW_PLATE_HEIGHT, LEGO_COLORS, LEGO_COLOR_MAP, resolvePartDefinition } from '../constants';
+import { useTranslation } from '../i18n';
 import { processMesh, normalizeScene } from '../utils/meshProcessor';
 
 interface ViewerProps {
@@ -25,6 +26,7 @@ export interface ViewerRef {
 }
 
 const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks, gridSize, showOriginal, showGenerated, brickType, lightRotation, onMeshLoaded, isLoading }, ref) => {
+  const { t } = useTranslation();
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -399,13 +401,13 @@ const Viewer = forwardRef<ViewerRef, ViewerProps>(({ objFile, voxels, mpdBricks,
     <div className="relative w-full h-full bg-neutral-900 overflow-hidden">
         <div ref={mountRef} className="w-full h-full" />
         {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
-                <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                    <div className="text-white font-bold text-xl animate-pulse">Processing...</div>
-                    <div className="text-neutral-400 text-sm mt-2">Computing 3D Geometry</div>
-                </div>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-10">
+            <div className="flex flex-col items-center">
+              <div className="w-10 h-10 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+              <div className="text-white font-bold text-xl animate-pulse">{t('viewer.processing.title')}</div>
+              <div className="text-neutral-400 text-sm mt-2">{t('viewer.processing.subtitle')}</div>
             </div>
+          </div>
         )}
     </div>
   );

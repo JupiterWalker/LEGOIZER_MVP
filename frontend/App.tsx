@@ -9,6 +9,7 @@ import { LEGO_COLORS, DEFAULT_SETTINGS } from './constants';
 import { ProcessingSettings, VoxelStruct, AiAnalysis, MpdBrick } from './types';
 import { parseMpdInstances } from './utils/ldraw';
 import Viewer, { ViewerRef } from './components/Viewer';
+import { supportedLanguages, useTranslation } from './i18n';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000';
 
@@ -25,6 +26,7 @@ const parseFilenameFromContentDisposition = (header: string | null): string | nu
 };
 
 export default function App() {
+    const { t, language, setLanguage } = useTranslation();
   const viewerRef = useRef<ViewerRef>(null);
   const [file, setFile] = useState<File | null>(null);
   const [mesh, setMesh] = useState<THREE.Object3D | null>(null);
@@ -119,7 +121,7 @@ export default function App() {
             });
 
             if (!response.ok) {
-                let detail = 'Processing failed.';
+                let detail = t('sidebar.error.processing');
                 try {
                     const payload = await response.json();
                     if (payload?.detail) {
@@ -162,7 +164,7 @@ export default function App() {
             setMpdFilename(derivedFilename);
         } catch (error) {
             console.error('Backend processing failed', error);
-            const message = error instanceof Error ? error.message : 'Processing failed.';
+            const message = error instanceof Error ? error.message : t('sidebar.error.processing');
             setApiError(message);
             setViewMode('original');
             alert(message);
@@ -181,7 +183,7 @@ export default function App() {
         document.body.removeChild(anchor);
     };
 
-  const handleExportLdr = () => {
+    const handleExportLdr = () => {
         if (mpdDownloadUrl) {
             const filename =
                 mpdFilename || `${aiAnalysis?.title || file?.name?.split('.')[0] || 'brickify_model'}.mpd`;
@@ -191,7 +193,7 @@ export default function App() {
     if (voxels.length === 0) return;
     // Converts strict JSON structure to LDraw
     const ldrContent = generateLDR(
-        voxels, 
+        voxels,
         settings.brickType,
         aiAnalysis?.title || file?.name.split('.')[0] || "model"
     );
@@ -204,22 +206,22 @@ export default function App() {
       {/* Sidebar Controls */}
       <div className="w-80 flex flex-col border-r border-neutral-800 bg-neutral-900 z-20 shadow-xl">
         <div className="p-6 border-b border-neutral-800">
-          <h1 className="text-2xl font-bold flex items-center gap-2 text-yellow-500">
+                    <h1 className="text-2xl font-bold flex items-center gap-2 text-yellow-500">
             <Box className="w-8 h-8" />
-            Brickify 3D
+                        {t('app.title')}
           </h1>
-          <p className="text-xs text-neutral-500 mt-1">OBJ / .GLB File &rarr; MPD</p>
+                    <p className="text-xs text-neutral-500 mt-1">{t('app.subtitle')}</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-8">
           {/* File Upload */}
           <section>
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-4">1. Load Model</h2>
+                        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-4">{t('sidebar.step1')}</h2>
             <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-neutral-700 border-dashed rounded-lg cursor-pointer hover:bg-neutral-800 transition-colors">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <Upload className="w-6 h-6 mb-2 text-neutral-400" />
                     <p className="text-xs text-neutral-400">
-                        {file ? file.name : "Upload .OBJ / .GLB File"}
+                                                {file ? file.name : t('sidebar.upload.placeholder')}
                     </p>
                 </div>
                 <input type="file" accept=".obj,.glb" className="hidden" onChange={handleFileChange} />
@@ -231,33 +233,32 @@ export default function App() {
           <section>
             <div className="pt-4 border-t border-neutral-800 space-y-3">
              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-4 flex items-center gap-2">
-                {/* <Settings className="w-4 h-4" /> Config */}
-                2. Config
+                {t('sidebar.step2')}
              </h2>
              
                 {/* Element Type */}
                 <div>
-                   <label className="block text-xs text-neutral-400 mb-2">Brick Type</label>
+                   <label className="block text-xs text-neutral-400 mb-2">{t('sidebar.brickType')}</label>
                    <div className="flex gap-2 p-1 bg-neutral-800 rounded-lg border border-neutral-700">
                         <button 
                             onClick={() => setSettings({...settings, brickType: 'brick'})}
                             className={`flex-1 py-1.5 text-xs rounded-md transition-all flex items-center justify-center gap-2 ${settings.brickType === 'brick' ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}
                         >
-                            <Box className="w-3 h-3" /> Brick
+                            <Box className="w-3 h-3" /> {t('sidebar.brick')}
                         </button>
                         <button 
                             onClick={() => setSettings({...settings, brickType: 'plate'})}
                             className={`flex-1 py-1.5 text-xs rounded-md transition-all flex items-center justify-center gap-2 ${settings.brickType === 'plate' ? 'bg-neutral-700 text-white shadow-sm' : 'text-neutral-500 hover:text-neutral-300'}`}
                         >
-                            <Layers className="w-3 h-3" /> Plate
+                            <Layers className="w-3 h-3" /> {t('sidebar.plate')}
                         </button>
                    </div>
                 </div>
 
                 <div>
                 <label className="block text-slate-300 text-sm mb-2">
-                    Longest Side Size (mm)
-                    <span className="block text-xs text-slate-500 mt-0.5">Scale the vertex cloud to this size.</span>
+                    {t('sidebar.longestSide')}
+                    <span className="block text-xs text-slate-500 mt-0.5">{t('sidebar.longestSide.helper')}</span>
                 </label>
                 <input 
                     type="number" 
@@ -305,15 +306,15 @@ export default function App() {
           </section>
 
           {/* Actions */}
-          <div className="pt-4 border-t border-neutral-800 space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">3. Process</h2>
+                    <div className="pt-4 border-t border-neutral-800 space-y-3">
+                        <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">{t('sidebar.step3')}</h2>
             <button
                 onClick={handleVoxelizeGeometric}
                 disabled={!mesh || isProcessing}
                 className="w-full py-3 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
             >
-                {isProcessing ? <RefreshCw className="animate-spin w-4 h-4"/> : <Box className="w-4 h-4"/>}
-                Voxelize Mesh
+                                {isProcessing ? <RefreshCw className="animate-spin w-4 h-4"/> : <Box className="w-4 h-4"/>}
+                                {t('sidebar.voxelize')}
             </button>
           </div>
 
@@ -338,7 +339,7 @@ export default function App() {
           {/* Export */}
             {isDone && (
                 <div className="pt-4 border-t border-neutral-800 space-y-3">
-                    <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">4. Export</h2>
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 mb-2">{t('sidebar.step4')}</h2>
 
                     <div className="flex gap-2">
                         {/* <button
@@ -352,17 +353,17 @@ export default function App() {
                             onClick={handleExportLdr}
                             className="flex-1 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg font-bold text-sm flex items-center justify-center gap-2"
                         >
-                            {!mpdDownloadUrl && voxels.length === 0 ? <RefreshCw className="animate-spin w-4 h-4"/> : <Download className="w-4 h-4" />} MPD
+                            {!mpdDownloadUrl && voxels.length === 0 ? <RefreshCw className="animate-spin w-4 h-4"/> : <Download className="w-4 h-4" />} {t('sidebar.export.mpd')}
                         </button>
                     </div>
                     {mpdDownloadUrl && (
                         <div className="text-xs text-neutral-500 bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2">
-                            <span className="text-green-400 font-semibold mr-2">MPD ready</span>
+                            <span className="text-green-400 font-semibold mr-2">{t('sidebar.export.ready')}</span>
                             {brickCount !== null && (
-                                <span className="mr-2">Bricks: {brickCount}</span>
+                                <span className="mr-2">{t('sidebar.metrics.bricks')}: {brickCount}</span>
                             )}
                             {voxelCount !== null && (
-                                <span>Voxels: {voxelCount}</span>
+                                <span>{t('sidebar.metrics.voxels')}: {voxelCount}</span>
                             )}
                         </div>
                     )}
@@ -384,23 +385,23 @@ export default function App() {
                     onClick={() => setViewMode('original')}
                     className={`px-3 py-1.5 text-sm flex items-center gap-2 transition-colors ${viewMode === 'original' ? 'bg-neutral-700 text-white' : 'text-neutral-400 hover:text-neutral-200'}`}
                 >
-                    <Eye className="w-4 h-4" /> Original
+                    <Eye className="w-4 h-4" /> {t('viewer.toggle.original')}
                 </button>
                 <button
                     onClick={() => setViewMode('generated')}
                     disabled={!hasGeneratedResult}
                     className={`px-3 py-1.5 text-sm flex items-center gap-2 transition-colors border-l border-neutral-700 ${viewMode === 'generated' ? 'bg-neutral-700 text-white' : hasGeneratedResult ? 'text-neutral-400 hover:text-neutral-200' : 'text-neutral-600 cursor-not-allowed'}`}
                 >
-                    <Sparkles className="w-4 h-4" /> Result
+                    <Sparkles className="w-4 h-4" /> {t('viewer.toggle.generated')}
                 </button>
             </div>
 
             <div className="bg-neutral-800/80 backdrop-blur text-neutral-400 px-3 py-1.5 rounded-md text-sm border border-neutral-700">
-                Voxels: {voxels.length}
+                {t('viewer.voxelCount')}: {voxels.length}
             </div>
 
             <div className="">
-                <label className="block text-xs text-neutral-400 mb-1">Light Angle</label>
+                <label className="block text-xs text-neutral-400 mb-1">{t('viewer.lightAngle')}</label>
                 <div className="flex items-center gap-2">
                     <input
                         type="range" min="0" max="360"
@@ -409,6 +410,21 @@ export default function App() {
                         className="flex-1 h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
                     />
                 </div>
+            </div>
+
+            <div className="flex items-center gap-2 bg-neutral-800/80 backdrop-blur border border-neutral-700 rounded-md px-3 py-1.5 text-sm text-neutral-400">
+              <span>{t('language.switcher.label')}</span>
+              <select
+                value={language}
+                onChange={(event) => setLanguage(event.target.value as typeof language)}
+                className="bg-neutral-900 border border-neutral-700 text-neutral-200 text-xs rounded px-2 py-1"
+              >
+                {supportedLanguages.map(({ code, label }) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
             </div>
         </div>
 
