@@ -3,18 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Dict
 
-from .utils import StageTimer
+from utils import StageTimer
 
-from .legoizer.export.ldraw_writer import write_mpd
-from .legoizer.io.obj_loader import load_obj
-from .legoizer.io.gltf_loader import load_gltf
-from .legoizer.planner.colorize import colorize_voxels
-from .legoizer.planner.tiler import tile_single_part_1x1, compute_stats_1x1
-from .legoizer.reporting.summary import Report
-from .legoizer.voxel.voxelize import mesh_to_voxels
+from legoizer.export.ldraw_writer import write_mpd
+from legoizer.io.obj_loader import load_obj
+from legoizer.io.gltf_loader import load_gltf
+from legoizer.planner.colorize import colorize_voxels
+from legoizer.planner.tiler import tile_single_part_1x1, compute_stats_1x1
+from legoizer.reporting.summary import Report
+from legoizer.voxel.voxelize import mesh_to_voxels
 # from .postprocess.mpd_optimizer import optimize_mpd_file
 # from .postprocess.opt_from_tencent import merge_1x1_to_larger
-from .postprocess.opt_v3 import optimize_mpd_file
+from postprocess.opt_v3 import optimize_mpd_file
 
 
 def generate_mpd_report(

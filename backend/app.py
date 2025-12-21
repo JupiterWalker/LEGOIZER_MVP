@@ -17,8 +17,8 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from backend.pipeline import generate_mpd_report
-from backend.utils import StageTimer
+from pipeline import generate_mpd_report
+from utils import StageTimer
 
 app = FastAPI(title="Legoizer API", version="0.1.0")
 
