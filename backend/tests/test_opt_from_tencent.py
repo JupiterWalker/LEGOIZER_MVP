@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from backend.postprocess import opt_from_tencent as opt
+from postprocess import opt_from_tencent as opt
 
 
 class TestUtilityFunctions(unittest.TestCase):

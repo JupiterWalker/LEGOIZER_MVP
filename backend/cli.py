@@ -2,7 +2,7 @@
 import argparse
 from pathlib import Path
 
-from backend.pipeline import generate_mpd_report
+from pipeline import generate_mpd_report
 
 
 def parse_args():

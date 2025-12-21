@@ -6,7 +6,7 @@ import numpy as np
 import trimesh
 from trimesh import repair
 
-from backend.utils import StageTimer
+from utils import StageTimer
 
 UNIT_SCALE_MM = {
     "m": 1000.0,

@@ -5,7 +5,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
-from backend.postprocess.color_table import COMMON_LDRAW_COLORS, LEGO_COLORS
+from postprocess.color_table import COMMON_LDRAW_COLORS, LEGO_COLORS
 
 
 STUD_PITCH_LDU = 20.0

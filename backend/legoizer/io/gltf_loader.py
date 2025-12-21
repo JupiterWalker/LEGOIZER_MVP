@@ -1,7 +1,7 @@
 import numpy as np
 import trimesh
 
-from backend.utils import StageTimer
+from utils import StageTimer
 from .obj_loader import UNIT_SCALE_MM
 
 
